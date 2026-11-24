@@ -10,6 +10,7 @@ PANEL = "#121C2F"
 PANEL_LIGHT = "#1A2740"
 CELL = "#17243A"
 CELL_HOVER = "#21324D"
+CELL_SHADOW = "#050A13"
 TEXT = "#F2F6FC"
 MUTED = "#91A0B8"
 ACCENT = "#5DE0C0"
@@ -37,7 +38,7 @@ def find_winner(board: Board) -> Optional[str]:
 
 
 def choose_computer_move(board: Board) -> int:
-    """Choose an optimal move for O using minimax."""
+    """Prefer a draw, but sometimes choose a move that can change the outcome."""
 
     def minimax(position: Board, is_computer_turn: bool, depth: int) -> int:
         winner = find_winner(position)
@@ -57,21 +58,28 @@ def choose_computer_move(board: Board) -> int:
                 position[index] = None
         return max(scores) if is_computer_turn else min(scores)
 
-    best_score = float("-inf")
-    best_moves = []
+    move_scores = []
     for index, cell in enumerate(board):
         if cell is None:
             board[index] = "O"
             score = minimax(board, False, 1)
             board[index] = None
-            if score > best_score:
-                best_score = score
-                best_moves = [index]
-            elif score == best_score:
-                best_moves.append(index)
-    if not best_moves:
+            move_scores.append((index, score))
+    if not move_scores:
         raise ValueError("No hay movimientos disponibles.")
-    return random.choice(best_moves)
+
+    best_score = max(score for _, score in move_scores)
+    draw_moves = [index for index, score in move_scores if score == 0]
+    if draw_moves:
+        return random.choice(draw_moves)
+
+    fallback_score = (
+        min(score for _, score in move_scores) if best_score > 0 else best_score
+    )
+    fallback_moves = [
+        index for index, score in move_scores if score == fallback_score
+    ]
+    return random.choice(fallback_moves)
 
 
 class TicTacToeApp:
@@ -191,6 +199,15 @@ class TicTacToeApp:
         board_frame.pack_propagate(False)
         for index in range(9):
             row, column = divmod(index, 3)
+            x = column * (self.cell_size + cell_gap)
+            y = row * (self.cell_size + cell_gap)
+            face_size = self.cell_size - 6
+            tk.Frame(board_frame, bg=CELL_SHADOW, bd=0).place(
+                x=x + 6,
+                y=y + 6,
+                width=face_size,
+                height=face_size,
+            )
             cell = tk.Button(
                 board_frame,
                 text="",
@@ -200,18 +217,20 @@ class TicTacToeApp:
                 activeforeground=TEXT,
                 activebackground=CELL_HOVER,
                 disabledforeground=TEXT,
-                relief="flat",
-                bd=0,
+                relief="raised",
+                overrelief="raised",
+                bd=3,
+                highlightthickness=0,
                 width=1,
                 height=1,
                 cursor="hand2",
                 command=lambda cell_index=index: self._play(cell_index),
             )
             cell.place(
-                x=column * (self.cell_size + cell_gap),
-                y=row * (self.cell_size + cell_gap),
-                width=self.cell_size,
-                height=self.cell_size,
+                x=x,
+                y=y,
+                width=face_size,
+                height=face_size,
             )
             cell.bind("<Enter>", lambda event, button=cell: self._on_hover(button, True))
             cell.bind("<Leave>", lambda event, button=cell: self._on_hover(button, False))
@@ -322,6 +341,7 @@ class TicTacToeApp:
             text=mark,
             fg=PLAYER_COLOR if mark == "X" else COMPUTER_COLOR,
             bg=PANEL_LIGHT,
+            relief="sunken",
             state="disabled",
             cursor="arrow",
         )
@@ -372,6 +392,7 @@ class TicTacToeApp:
                 text="",
                 fg=TEXT,
                 bg=CELL,
+                relief="raised",
                 state="normal",
                 cursor="hand2",
             )
